@@ -7,7 +7,7 @@ STUBHUB_URL = "https://www.stubhub.com/roger-federer-flushing-tickets-8-25-2026/
 MY_BUDGET = 250
 
 def run():
-    print("🚀 Cloud Tracker: Isolating Seating Configurations...")
+    print("🚀 Cloud Tracker: Running Bulletproof Text Scan...")
     
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
@@ -23,27 +23,41 @@ def run():
             
             raw_text = page.locator("body").text_content()
             
+            # Clean up the text layout into distinct words/phrases
+            tokens = [t.strip() for t in re.split(r'(\s+)', raw_text) if t.strip()]
+            full_clean_text = " ".join(tokens)
+            
             print("\n================ WATCHMAN ALERTS ================")
             
-            # This regex looks specifically for strings containing 'Section X Row Y' followed by a price symbol
-            # Example: Section 324Row Z2 tickets together...$259
-            pattern = r"Section\s*(\d+)\s*Row\s*([A-Za-z\d\-]+).*?\$(\d{1,4})"
-            
-            matches = re.findall(pattern, raw_text)
+            # Find every instance of a Section configuration on the page
+            section_matches = list(re.finditer(r"Section\s*(\d+)\s*Row\s*([A-Za-z\d\-]+)", full_clean_text))
             
             match_count = 0
-            for section, row, price_str in matches:
-                price = int(price_str)
-                print(f"📌 Detected: Section {section}, Row {row} -> ${price}")
+            for index, match in enumerate(section_matches):
+                section = match.group(1)
+                row = match.group(2)
                 
-                if price <= MY_BUDGET:
-                    print(f"🚨 MATCH UNDER BUDGET: Section {section}, Row {row} is available for ${price}!")
-                    match_count += 1
-            
-            if len(matches) == 0:
-                print("⚠️ Text patterns did not cleanly slice. StubHub text layout may have shifted slightly.")
+                # Determine where this seat profile ends and the next one begins
+                start_pos = match.start()
+                end_pos = section_matches[index+1].start() if index + 1 < len(section_matches) else len(full_clean_text)
+                
+                # Isolate the exact chunk of text dedicated to this specific seat listing
+                text_chunk = full_clean_text[start_pos:end_pos]
+                
+                # Search for the dollar amount inside this isolated ticket block
+                price_match = re.search(r'\$(\d{1,4})', text_chunk)
+                if price_match:
+                    price = int(price_match.group(1))
+                    print(f"📌 Ticket Target: Section {section}, Row {row} -> ${price}")
+                    
+                    if price <= MY_BUDGET:
+                        print(f"🚨 MATCH UNDER BUDGET! Section {section}, Row {row} is ${price}!")
+                        match_count += 1
+                        
+            if not section_matches:
+                print("⚠️ Could not read seating components from the text layout layer.")
             elif match_count == 0:
-                print(f"ℹ️ Scanned all visible listings. Current market baseline is above ${MY_BUDGET}.")
+                print(f"ℹ️ Scanned all {len(section_matches)} visible layout blocks. No seats under ${MY_BUDGET} yet.")
                 
             print("=================================================")
             
