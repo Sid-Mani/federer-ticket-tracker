@@ -7,7 +7,7 @@ STUBHUB_URL = "https://www.stubhub.com/roger-federer-flushing-tickets-8-25-2026/
 MY_BUDGET = 250
 
 def run():
-    print("🚀 Cloud Tracker: Extracting Row and Seating Data...")
+    print("🚀 Cloud Tracker: Isolating Seating Configurations...")
     
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
@@ -19,40 +19,36 @@ def run():
         
         try:
             page.goto(STUBHUB_URL, timeout=60000)
-            print("⏳ Page loaded. Parsing visible elements...")
-            time.sleep(12) # Give the listings plenty of time to populate fully
+            time.sleep(12) 
             
-            # Extract clean text blocks from the webpage
             raw_text = page.locator("body").text_content()
-            lines = [line.strip() for line in raw_text.split("\n") if line.strip()]
             
-            print("\n---------------- WATCHMAN REPORT ----------------")
+            print("\n================ WATCHMAN ALERTS ================")
             
-            # Look through lines to tie prices together with their matching Row/Section
-            for i, line in enumerate(lines):
-                # Search for any string that contains a dollar sign
-                if "$" in line:
-                    # Regular expression to extract just the main digits before a decimal point (e.g., $259.00 -> 259)
-                    price_match = re.search(r'\$(\d{1,4})', line)
-                    if price_match:
-                        current_price = int(price_match.group(1))
-                        
-                        # Grab a window of 4 lines around the price to capture the Section and Row numbers
-                        start_window = max(0, i - 3)
-                        end_window = min(len(lines), i + 3)
-                        surrounding_context = " | ".join(lines[start_window:end_window])
-                        
-                        # Print EVERYTHING it finds right now so we can see the exact layout
-                        print(f"💰 Found Ticket: ${current_price} -> Context: {surrounding_context}")
-                        
-                        # If it hits our budget target, drop an alert!
-                        if current_price <= MY_BUDGET:
-                            print(f"🚨 ALERT: THIS ONE IS IN BUDGET! (${current_price})")
-                            
-            print("-------------------------------------------------")
+            # This regex looks specifically for strings containing 'Section X Row Y' followed by a price symbol
+            # Example: Section 324Row Z2 tickets together...$259
+            pattern = r"Section\s*(\d+)\s*Row\s*([A-Za-z\d\-]+).*?\$(\d{1,4})"
+            
+            matches = re.findall(pattern, raw_text)
+            
+            match_count = 0
+            for section, row, price_str in matches:
+                price = int(price_str)
+                print(f"📌 Detected: Section {section}, Row {row} -> ${price}")
+                
+                if price <= MY_BUDGET:
+                    print(f"🚨 MATCH UNDER BUDGET: Section {section}, Row {row} is available for ${price}!")
+                    match_count += 1
+            
+            if len(matches) == 0:
+                print("⚠️ Text patterns did not cleanly slice. StubHub text layout may have shifted slightly.")
+            elif match_count == 0:
+                print(f"ℹ️ Scanned all visible listings. Current market baseline is above ${MY_BUDGET}.")
+                
+            print("=================================================")
             
         except Exception as e:
-            print(f"❌ Automation encountered an error: {str(e)}")
+            print(f"❌ Error: {str(e)}")
             
         browser.close()
     print("🏁 Loop complete.")
