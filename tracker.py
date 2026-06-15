@@ -4,48 +4,32 @@ import time
 from playwright.sync_api import sync_playwright
 
 STUBHUB_URL = "https://www.stubhub.com/roger-federer-flushing-tickets-8-25-2026/event/161318967/"
-MY_BUDGET = 250
 
 def run():
-    print("🚀 Cloud Tracker Started...")
+    print("🚀 Cloud Tracker Diagnostic Mode Started...")
     
     with sync_playwright() as p:
+        # We add an argument here to look like a normal desktop user so we don't get blocked
         browser = p.chromium.launch(headless=True)
-        page = browser.new_page()
+        context = browser.new_context(
+            user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        )
+        page = context.new_page()
 
-        # This magic function listens to the background network data streams!
+        # Print out the URL of every background Fetch/XHR data request that happens
         def handle_response(response):
-            # We look for StubHub's background data payload
-            if "event" in response.url or "listings" in response.url:
-                try:
-                    # Parse the raw network data into clean Python text
-                    data = response.json()
-                    
-                    # Dig into StubHub's data structure to find the ticket array
-                    # Note: We'll fine-tune these exact keys once we catch the first payload
-                    listings = data.get("items", []) or data.get("listings", [])
-                    
-                    print(f"📡 Found background data stream! Analyzing {len(listings)} listings...")
-                    
-                    for ticket in listings:
-                        price = ticket.get("price", 9999)
-                        row = ticket.get("row", "Unknown Row")
-                        section = ticket.get("section", "Unknown Section")
-                        
-                        if price <= MY_BUDGET:
-                            print(f"🚨 MATCH found! Section {section}, Row {row} is ${price}!")
-                except Exception:
-                    pass # Skip background files that aren't clean data
+            request_type = response.request.resource_type
+            if request_type in ["fetch", "xhr"]:
+                print(f"📡 Caught Data Stream URL: {response.url[:120]}...") # truncate if too long
 
-        # Tell the page to monitor background responses
         page.on("response", handle_response)
         
-        print("🤖 Opening StubHub in the cloud...")
-        page.goto(STUBHUB_URL)
-        time.sleep(8) # Give the data streams plenty of time to finish loading
+        print("🤖 Opening StubHub...")
+        page.goto(STUBHUB_URL, wait_until="networkidle") # Wait until the network goes completely quiet
+        time.sleep(5) 
         
         browser.close()
-    print("🏁 Loop complete.")
+    print("🏁 Diagnostic Loop complete.")
 
 if __name__ == "__main__":
     run()
