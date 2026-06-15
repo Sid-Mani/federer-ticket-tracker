@@ -4,10 +4,9 @@ import time
 from playwright.sync_api import sync_playwright
 
 STUBHUB_URL = "https://www.stubhub.com/roger-federer-flushing-tickets-8-25-2026/event/161318967/"
-MY_BUDGET = 250
 
 def run():
-    print("🚀 Cloud Tracker: Targeting JSA Data Stream...")
+    print("🚀 Cloud Tracker: Extracting JSA Keys...")
     
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
@@ -16,51 +15,33 @@ def run():
         )
         page = context.new_page()
 
-        # Intercept and process the data stream
         def handle_response(response):
-            # Target the specific JSON API pipe you caught
+            # Let's catch anything coming from their JSA endpoint
             if "jsa/v1/events" in response.url:
                 try:
                     data = response.json()
+                    print("\n🔑 --- FOUND RAW JSA STREAM ---")
+                    print(f"URL: {response.url[:80]}...")
+                    # Print out the top-level keys so we can see how StubHub structures their data object
+                    print(f"Top-level keys in this JSON: {list(data.keys())}")
                     
-                    # Target StubHub's listing data array inside the payload
-                    # (Usually nested under 'items' or 'listings' inside their map object)
-                    listings = data.get("items", []) or data.get("listings", []) or data.get("itemsList", [])
-                    
-                    print(f"\n🎯 FOUND RAW DATA FEED! Analyzing {len(listings)} active ticket groups...")
-                    
-                    match_count = 0
-                    for ticket in listings:
-                        # Extract exact details (handling various potential naming structures)
-                        price = ticket.get("price", ticket.get("rawPrice", 9999))
-                        row = ticket.get("row", ticket.get("rowName", "Unknown Row"))
-                        section = ticket.get("section", ticket.get("sectionName", "Unknown Section"))
-                        
-                        if price <= MY_BUDGET:
-                            print(f"🚨 IN BUDGET: Section {section}, Row {row} -> ${price}")
-                            match_count += 1
-                    
-                    if match_count == 0:
-                        print("ℹ️ Evaluated listings, but none are under budget right now.")
-                        
+                    # If there's an 'event' or 'grid' object inside, show its keys too
+                    for key in ['event', 'catalog', 'grid', 'data']:
+                        if key in data and isinstance(data[key], dict):
+                            print(f"Keys inside '{key}': {list(data[key].keys())}")
+                    print("---------------------------------\n")
                 except Exception as e:
-                    # If the data structure looks slightly different, dump a small preview so we can inspect it
-                    try:
-                        text_preview = response.text()[:300]
-                        print(f"📡 Caught structure: {text_preview}")
-                    except:
-                        pass
+                    print(f"⚠️ Found JSA stream but failed to read keys: {str(e)}")
 
         page.on("response", handle_response)
         
         print("🤖 Opening StubHub...")
         try:
-            # We remove wait_until="networkidle" to prevent timeouts, and use a safe 45-second overall window
             page.goto(STUBHUB_URL, timeout=45000)
-            print("⏳ Waiting for map layers to settle...")
-            time.sleep(12) 
+            print("⏳ Waiting for data packets...")
+            time.sleep(15) 
         except Exception as e:
-            print(f"⚠️ Page navigation hit a limit, proceeding to process caught data...")
+            print(f"⚠️ Page hit limit, checking captured frames...")
             
         browser.close()
     print("🏁 Loop complete.")
