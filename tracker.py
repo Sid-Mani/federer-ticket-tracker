@@ -8,7 +8,7 @@ from playwright_stealth import Stealth
 # Configuration
 MY_BUDGET = 250
 MAX_DISPLAY_PRICE = 350
-DISCORD_WEBHOOK_URL = "" 
+DISCORD_WEBHOOK_URL = "" # Paste your Discord webhook link here if using
 
 TRACKING_SITES = {
     "StubHub": "https://www.stubhub.com/roger-federer-flushing-tickets-8-25-2026/event/161318967/",
@@ -27,37 +27,44 @@ def send_alert(site, section, row, price):
 def scan_site(page, name, url):
     print(f"\n🔍 Scanning {name}...")
     all_site_tickets = []
+    seen_tickets = set()
+    
     try:
-        page.goto(url, timeout=45000)
-        time.sleep(12)
+        # Load the marketplace and allow scripts to fully unpack the interface
+        page.goto(url, timeout=60000)
+        time.sleep(15) 
         
-        raw_text = page.locator("body").text_content()
-        tokens = [t.strip() for t in re.split(r'(\s+)', raw_text) if t.strip()]
-        full_clean_text = " ".join(tokens)
+        # Universal inner HTML extraction to read layout content regardless of DOM nesting structure
+        raw_html = page.content()
         
-        # Expanded patterns to gracefully grab Vivid & SeatGeek formats 
-        # (e.g. "Section 303. Row F... $362" or "$250 incl. fees")
+        # Super-regex profiles capable of parsing broken text chunks, fees, and multi-line spans
         patterns = [
-            r"(?:Section|Sec)\s*(\d+)[^\d]*?Row\s*([A-Za-z\d\-]+).*?\$(\d{1,4})",
-            r"\$(\d{1,4}).*?(?:Section|Sec)\s*(\d+)[^\d]*?Row\s*([A-Za-z\d\-]+)"
+            r"(?:Section|Sec)\s*(\d+).*?Row\s*([A-Za-z\d\-]+).*?\$(\d{1,4})",
+            r"\$(\d{1,4}).*?(?:Section|Sec)\s*(\d+).*?Row\s*([A-Za-z\d\-]+)",
+            r"(?:Section|Sec)\s*(\d+)[^\d]*?\$(\d{1,4})" # Safety loop if a platform drops the Row string entirely
         ]
         
-        seen_tickets = set()
-        
+        # Scan data blocks
         for pattern in patterns:
-            for match in re.finditer(pattern, full_clean_text, re.IGNORECASE):
-                # Check group configuration depending on which pattern matched
-                if pattern == patterns[0]:
-                    sec_num, row_num, price_str = match.group(1), match.group(2), match.group(3)
-                else:
-                    price_str, sec_num, row_num = match.group(1), match.group(2), match.group(3)
-                
-                price = int(price_str)
-                ticket = parse_valid_ticket(sec_num, row_num, price, seen_tickets)
-                if ticket: 
-                    all_site_tickets.append(ticket)
-        
-        # Sort primarily by Row Letter (A-Z) and secondarily by lowest price
+            for match in re.finditer(pattern, raw_html, re.IGNORECASE | re.DOTALL):
+                try:
+                    if pattern == patterns[0]:
+                        sec, row, prc = match.group(1), match.group(2), int(match.group(3))
+                    elif pattern == patterns[1]:
+                        prc, sec, row = int(match.group(1)), match.group(2), match.group(3)
+                    else:
+                        sec, row, prc = match.group(1), "ANY", int(match.group(2))
+                        
+                    # Filter and sanitize data fields
+                    if 100 <= int(sec) <= 499 and 100 <= prc <= MAX_DISPLAY_PRICE:
+                        ticket_id = f"{sec}-{row}-{prc}"
+                        if ticket_id not in seen_tickets:
+                            seen_tickets.add(ticket_id)
+                            all_site_tickets.append({"section": sec, "row": row.upper(), "price": prc})
+                except:
+                    continue
+
+        # Sort cleanly: Alphabetical by Row, then ascending by cheapest price
         sorted_tickets = sorted(all_site_tickets, key=lambda x: (x['row'], x['price']))
         
         for t in sorted_tickets:
@@ -67,15 +74,7 @@ def scan_site(page, name, url):
                         
         print(f"✅ {name}: Successfully tracked {len(sorted_tickets)} verified listings.")
     except Exception as e:
-        print(f"❌ {name} execution hitch: {str(e)}")
-
-def parse_valid_ticket(sec_num, row_num, price, seen_tickets):
-    if 100 <= int(sec_num) <= 400:
-        ticket_id = f"{sec_num}-{row_num}-{price}"
-        if ticket_id not in seen_tickets and 100 <= price <= MAX_DISPLAY_PRICE:
-            seen_tickets.add(ticket_id)
-            return {"section": sec_num, "row": row_num.upper(), "price": price}
-    return None
+        print(f"❌ {name} execution breakdown: {str(e)}")
 
 def run():
     print("🚀 Cloud Watchman Matrix: Sorted Tracking Mode Active...")
@@ -89,12 +88,13 @@ def run():
             locale="en-US"
         )
         
+        # Apply strict 2026 stealth specifications directly onto the synchronization layer
         stealth.apply_stealth_sync(context)
         page = context.new_page()
         
         for name, url in TRACKING_SITES.items():
             scan_site(page, name, url)
-            time.sleep(6)
+            time.sleep(8) # Space out requests to bypass bot firewalls naturally
             
         browser.close()
     print("🏁 Sweep complete.")
