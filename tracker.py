@@ -13,7 +13,8 @@ DISCORD_WEBHOOK_URL = ""
 TRACKING_SITES = {
     "StubHub": "https://www.stubhub.com/roger-federer-flushing-tickets-8-25-2026/event/161318967/",
     "VividSeats": "https://www.vividseats.com/us-open-roger-federer---an-icon-returns-to-ny-tickets-arthur-ashe-stadium-8-25-2026--sports-tennis/production/7134771?quantity=2",
-    "TickPick": "https://www.tickpick.com/buy-us-open-roger-federer-an-icon-returns-to-ny-tickets-arthur-ashe-stadium-8-25-26-7pm/8034802/"
+    "TickPick": "https://www.tickpick.com/buy-us-open-roger-federer-an-icon-returns-to-ny-tickets-arthur-ashe-stadium-8-25-26-7pm/8034802/",
+    "SeatGeek": "https://seatgeek.com/us-open-tennis-tickets/tennis/2026-08-25-7-pm/18293103"
 }
 
 def send_alert(site, section, row, price):
@@ -34,22 +35,27 @@ def scan_site(page, name, url):
         tokens = [t.strip() for t in re.split(r'(\s+)', raw_text) if t.strip()]
         full_clean_text = " ".join(tokens)
         
+        # Expanded patterns to gracefully grab Vivid & SeatGeek formats 
+        # (e.g. "Section 303. Row F... $362" or "$250 incl. fees")
         patterns = [
-            r"(?:Section|Sec)\s*(\d+).*?Row\s*([A-Za-z\d\-]+).*?\$(\d{1,4})",
-            r"\$(\d{1,4}).*?(?:Section|Sec)\s*(\d+).*?Row\s*([A-Za-z\d\-]+)"
+            r"(?:Section|Sec)\s*(\d+)[^\d]*?Row\s*([A-Za-z\d\-]+).*?\$(\d{1,4})",
+            r"\$(\d{1,4}).*?(?:Section|Sec)\s*(\d+)[^\d]*?Row\s*([A-Za-z\d\-]+)"
         ]
         
         seen_tickets = set()
         
-        for match in re.finditer(patterns[0], full_clean_text, re.IGNORECASE):
-            sec_num, row_num, price = match.group(1), match.group(2), int(match.group(3))
-            ticket = parse_valid_ticket(sec_num, row_num, price, seen_tickets)
-            if ticket: all_site_tickets.append(ticket)
-            
-        for match in re.finditer(patterns[1], full_clean_text, re.IGNORECASE):
-            price, sec_num, row_num = int(match.group(1)), match.group(2), match.group(3)
-            ticket = parse_valid_ticket(sec_num, row_num, price, seen_tickets)
-            if ticket: all_site_tickets.append(ticket)
+        for pattern in patterns:
+            for match in re.finditer(pattern, full_clean_text, re.IGNORECASE):
+                # Check group configuration depending on which pattern matched
+                if pattern == patterns[0]:
+                    sec_num, row_num, price_str = match.group(1), match.group(2), match.group(3)
+                else:
+                    price_str, sec_num, row_num = match.group(1), match.group(2), match.group(3)
+                
+                price = int(price_str)
+                ticket = parse_valid_ticket(sec_num, row_num, price, seen_tickets)
+                if ticket: 
+                    all_site_tickets.append(ticket)
         
         # Sort primarily by Row Letter (A-Z) and secondarily by lowest price
         sorted_tickets = sorted(all_site_tickets, key=lambda x: (x['row'], x['price']))
@@ -83,9 +89,7 @@ def run():
             locale="en-US"
         )
         
-        # 🛠️ FIXED: Called the exact, real method on the context layer
         stealth.apply_stealth_sync(context)
-        
         page = context.new_page()
         
         for name, url in TRACKING_SITES.items():
