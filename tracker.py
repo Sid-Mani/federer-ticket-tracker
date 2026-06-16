@@ -3,12 +3,12 @@ import re
 import time
 import requests
 from playwright.sync_api import sync_playwright
-from playwright_stealth import stealth_sync
+from playwright_stealth import stealth_page  # 🛠️ Fixed the import name here
 
 # Configuration
 MY_BUDGET = 250
 MAX_DISPLAY_PRICE = 350
-DISCORD_WEBHOOK_URL = "" # Paste your Discord webhook link here if using
+DISCORD_WEBHOOK_URL = "" 
 
 TRACKING_SITES = {
     "StubHub": "https://www.stubhub.com/roger-federer-flushing-tickets-8-25-2026/event/161318967/",
@@ -41,20 +41,17 @@ def scan_site(page, name, url):
         
         seen_tickets = set()
         
-        # Collect Pattern 1: Section -> Row -> Price
         for match in re.finditer(patterns[0], full_clean_text, re.IGNORECASE):
             sec_num, row_num, price = match.group(1), match.group(2), int(match.group(3))
             ticket = parse_valid_ticket(sec_num, row_num, price, seen_tickets)
             if ticket: all_site_tickets.append(ticket)
             
-        # Collect Pattern 2: Price -> Section -> Row
         for match in re.finditer(patterns[1], full_clean_text, re.IGNORECASE):
             price, sec_num, row_num = int(match.group(1)), match.group(2), match.group(3)
             ticket = parse_valid_ticket(sec_num, row_num, price, seen_tickets)
             if ticket: all_site_tickets.append(ticket)
         
-        # --- THE SORTING MAGIC ---
-        # Sorts primarily by Row Letter (A-Z) and secondarily by lowest price
+        # Sort primarily by Row Letter (A-Z) and secondarily by lowest price
         sorted_tickets = sorted(all_site_tickets, key=lambda x: (x['row'], x['price']))
         
         for t in sorted_tickets:
@@ -67,7 +64,6 @@ def scan_site(page, name, url):
         print(f"❌ {name} execution hitch: {str(e)}")
 
 def parse_valid_ticket(sec_num, row_num, price, seen_tickets):
-    # Verify section falls within standard Arthur Ashe configurations
     if 100 <= int(sec_num) <= 400:
         ticket_id = f"{sec_num}-{row_num}-{price}"
         if ticket_id not in seen_tickets and 100 <= price <= MAX_DISPLAY_PRICE:
@@ -85,7 +81,7 @@ def run():
             locale="en-US"
         )
         page = context.new_page()
-        stealth_sync(page)
+        stealth_page(page)  # 🛠️ Fixed the execution function name here
         
         for name, url in TRACKING_SITES.items():
             scan_site(page, name, url)
