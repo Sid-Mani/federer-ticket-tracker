@@ -8,7 +8,7 @@ from playwright_stealth import Stealth
 # Configuration
 MY_BUDGET = 250
 MAX_DISPLAY_PRICE = 350
-DISCORD_WEBHOOK_URL = "" # Paste your Discord webhook link here
+DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1516297829625237534/CUBpAReH2axHrhWpvw9Ivk7NSVAoxRPWOO7JYA4yhjAbXmMi7VC2yih8zmeksbMoxB9W" # Paste your Discord webhook link here
 
 TRACKING_SITES = {
     "StubHub": "https://www.stubhub.com/roger-federer-flushing-tickets-8-25-2026/event/161318967/",
