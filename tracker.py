@@ -73,8 +73,6 @@ def parse_valid_ticket(sec_num, row_num, price, seen_tickets):
 
 def run():
     print("🚀 Cloud Watchman Matrix: Sorted Tracking Mode Active...")
-    
-    # 🛠️ Initializing the class cleanly without the nested syntax crash
     stealth = Stealth()
     
     with sync_playwright() as p:
@@ -84,10 +82,11 @@ def run():
             viewport={"width": 1440, "height": 900},
             locale="en-US"
         )
-        page = context.new_page()
         
-        # Apply the stealth configuration to the page layout natively
-        stealth.apply_sync(page)
+        # 🛠️ FIXED: Called the exact, real method on the context layer
+        stealth.apply_stealth_sync(context)
+        
+        page = context.new_page()
         
         for name, url in TRACKING_SITES.items():
             scan_site(page, name, url)
