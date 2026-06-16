@@ -3,7 +3,7 @@ import re
 import time
 import requests
 from playwright.sync_api import sync_playwright
-from playwright_stealth import stealth  # 🛠️ This is the exact function name!
+import playwright_stealth  # 🛠️ Cleaned up to import the module folder directly
 
 # Configuration
 MY_BUDGET = 250
@@ -81,7 +81,9 @@ def run():
             locale="en-US"
         )
         page = context.new_page()
-        stealth(page)  # 🛠️ Called the correct variable function here!
+        
+        # 🛠️ Explicitly calling the exact path inside the module
+        playwright_stealth.stealth_sync(page)  
         
         for name, url in TRACKING_SITES.items():
             scan_site(page, name, url)
