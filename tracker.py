@@ -3,7 +3,7 @@ import re
 import time
 import requests
 from playwright.sync_api import sync_playwright
-import playwright_stealth  # 🛠️ Cleaned up to import the module folder directly
+from playwright_stealth import Stealth  # 🛠️ New 2.x class structure!
 
 # Configuration
 MY_BUDGET = 250
@@ -74,22 +74,24 @@ def parse_valid_ticket(sec_num, row_num, price, seen_tickets):
 def run():
     print("🚀 Cloud Watchman Matrix: Sorted Tracking Mode Active...")
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        context = browser.new_context(
-            user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-            viewport={"width": 1440, "height": 900},
-            locale="en-US"
-        )
-        page = context.new_page()
+        # 🛠️ Instantiating the new Stealth engine class mapping
+        stealth = Stealth()
         
-        # 🛠️ Explicitly calling the exact path inside the module
-        playwright_stealth.stealth_sync(page)  
-        
-        for name, url in TRACKING_SITES.items():
-            scan_site(page, name, url)
-            time.sleep(6)
+        # Open the automated browser mapping context using the new API hooks
+        with stealth.use_sync(p) as dynamic_pw:
+            browser = dynamic_pw.chromium.launch(headless=True)
+            context = browser.new_context(
+                user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+                viewport={"width": 1440, "height": 900},
+                locale="en-US"
+            )
+            page = context.new_page()
             
-        browser.close()
+            for name, url in TRACKING_SITES.items():
+                scan_site(page, name, url)
+                time.sleep(6)
+                
+            browser.close()
     print("🏁 Sweep complete.")
 
 if __name__ == "__main__":
