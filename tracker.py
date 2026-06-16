@@ -6,7 +6,7 @@ from playwright.sync_api import sync_playwright
 
 MY_BUDGET = 250
 # Paste your Discord Webhook URL here if you want phone alerts, or leave it as ""
-DISCORD_WEBHOOK_URL = "" 
+DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1516297829625237534/CUBpAReH2axHrhWpvw9Ivk7NSVAoxRPWOO7JYA4yhjAbXmMi7VC2yih8zmeksbMoxB9W" 
 
 TRACKING_SITES = {
     "StubHub": "https://www.stubhub.com/roger-federer-flushing-tickets-8-25-2026/event/161318967/",
